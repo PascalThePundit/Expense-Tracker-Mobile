@@ -38,12 +38,36 @@ class DashboardScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Recent Transactions',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (transactions.isNotEmpty)
+                        Text(
+                          '${transactions.length} record${transactions.length == 1 ? '' : 's'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
-                    'Recent Transactions',
+                    'Swipe left to delete • Tap to edit',
                     style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1E293B),
+                      fontSize: 11,
+                      color: const Color(0xFFCBD5E1),
                     ),
                   ),
                 ),
@@ -57,7 +81,7 @@ class DashboardScreen extends StatelessWidget {
                           itemCount: transactions.length,
                           itemBuilder: (context, index) {
                             return _buildTransactionCard(
-                                transactions[index]);
+                                context, transactions[index]);
                           },
                         ),
                 ),
@@ -199,12 +223,12 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTransactionCard(TransactionModel transaction) {
+  Widget _buildTransactionCard(
+      BuildContext context, TransactionModel transaction) {
     final formatter =
         NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final dateFormatter = DateFormat('MMM d, yyyy');
 
-    // Income category metadata
     final incomeMeta = {
       'Offering': {
         'icon': Icons.volunteer_activism_rounded,
@@ -240,67 +264,146 @@ class DashboardScreen extends StatelessWidget {
       color = const Color(0xFFFB7185);
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+    return Dismissible(
+      key: Key(transaction.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.title,
+            title: Text(
+              'Delete Transaction?',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+            content: Text(
+              'This will permanently remove "${transaction.title}". This cannot be undone.',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(
+                  'Cancel',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    color: const Color(0xFF64748B),
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1E293B),
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '${transaction.category} • ${dateFormatter.format(transaction.date)}',
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(
+                  'Delete',
                   style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF94A3B8),
+                    color: const Color(0xFFFB7185),
+                    fontWeight: FontWeight.w600,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            '${transaction.isExpense ? '-' : '+'}${formatter.format(transaction.amount)}',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: transaction.isExpense
-                  ? const Color(0xFFFB7185)
-                  : const Color(0xFF34D399),
+        );
+      },
+      onDismissed: (_) {
+        transaction.delete();
+      },
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFB7185),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 26,
+        ),
+      ),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  AddTransactionScreen(existing: transaction),
             ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      transaction.title,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${transaction.category} • ${dateFormatter.format(transaction.date)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${transaction.isExpense ? '-' : '+'}${formatter.format(transaction.amount)}',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: transaction.isExpense
+                      ? const Color(0xFFFB7185)
+                      : const Color(0xFF34D399),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
