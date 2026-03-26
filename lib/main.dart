@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'models/transaction_model.dart';
@@ -16,6 +17,12 @@ Future<void> main() async {
   final settingsBox = await Hive.openBox('settings');
   final isDark = settingsBox.get('darkMode', defaultValue: false) as bool;
   themeModeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+  ));
+
   runApp(const MyApp());
 }
 
@@ -28,14 +35,16 @@ class MyApp extends StatelessWidget {
       valueListenable: themeModeNotifier,
       builder: (context, mode, _) {
         return MaterialApp(
-          title: 'Church Expense Tracker',
+          title: 'Church Finance',
           debugShowCheckedModeBanner: false,
           themeMode: mode,
           theme: AppTheme.light().copyWith(
-            textTheme: GoogleFonts.interTextTheme(AppTheme.light().textTheme),
+            textTheme:
+                GoogleFonts.interTextTheme(AppTheme.light().textTheme),
           ),
           darkTheme: AppTheme.dark().copyWith(
-            textTheme: GoogleFonts.interTextTheme(AppTheme.dark().textTheme),
+            textTheme:
+                GoogleFonts.interTextTheme(AppTheme.dark().textTheme),
           ),
           home: const MainShell(),
         );

@@ -6,8 +6,62 @@ import '../models/transaction_model.dart';
 import '../theme/app_theme.dart';
 import 'add_transaction_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  // null means "All" months
+  DateTime? _selectedMonth;
+
+  List<DateTime> _buildMonthList(List<TransactionModel> transactions) {
+    final months = transactions
+        .map((t) => DateTime(t.date.year, t.date.month))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+    return months;
+  }
+
+  bool _isSelectedMonth(DateTime month) {
+    return _selectedMonth != null &&
+        _selectedMonth!.year == month.year &&
+        _selectedMonth!.month == month.month;
+  }
+
+  List<TransactionModel> _filterTransactions(
+      List<TransactionModel> all) {
+    if (_selectedMonth == null) return all;
+    return all
+        .where((t) =>
+            t.date.year == _selectedMonth!.year &&
+            t.date.month == _selectedMonth!.month)
+        .toList();
+  }
+
+  void _showSnackbar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(
+              fontSize: 13, fontWeight: FontWeight.w500),
+        ),
+        backgroundColor:
+            isError ? const Color(0xFFFB7185) : const Color(0xFF2563EB),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        margin:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,13 +73,16 @@ class DashboardScreen extends StatelessWidget {
       body: ValueListenableBuilder(
         valueListenable: box.listenable(),
         builder: (context, Box<TransactionModel> box, _) {
-          final transactions = box.values.toList()
+          final allTransactions = box.values.toList()
             ..sort((a, b) => b.date.compareTo(a.date));
 
-          final totalIncome = transactions
+          final months = _buildMonthList(allTransactions);
+          final filtered = _filterTransactions(allTransactions);
+
+          final totalIncome = filtered
               .where((t) => !t.isExpense)
               .fold(0.0, (sum, t) => sum + t.amount);
-          final totalExpense = transactions
+          final totalExpense = filtered
               .where((t) => t.isExpense)
               .fold(0.0, (sum, t) => sum + t.amount);
           final balance = totalIncome - totalExpense;
@@ -35,13 +92,48 @@ class DashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(balance, totalIncome, totalExpense),
-                const SizedBox(height: 24),
+
+                // Month filter chips
+                if (months.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 36,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: months.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _buildMonthChip(
+                            label: 'All',
+                            isSelected: _selectedMonth == null,
+                            colors: colors,
+                            onTap: () =>
+                                setState(() => _selectedMonth = null),
+                          );
+                        }
+                        final month = months[index - 1];
+                        return _buildMonthChip(
+                          label: DateFormat('MMM yyyy').format(month),
+                          isSelected: _isSelectedMonth(month),
+                          colors: colors,
+                          onTap: () =>
+                              setState(() => _selectedMonth = month),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 20),
+
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: [
                       Text(
-                        'Recent Transactions',
+                        'Transactions',
                         style: GoogleFonts.inter(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -49,13 +141,11 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      if (transactions.isNotEmpty)
+                      if (filtered.isNotEmpty)
                         Text(
-                          '${transactions.length} record${transactions.length == 1 ? '' : 's'}',
+                          '${filtered.length} record${filtered.length == 1 ? '' : 's'}',
                           style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: colors.textMuted,
-                          ),
+                              fontSize: 12, color: colors.textMuted),
                         ),
                     ],
                   ),
@@ -66,22 +156,21 @@ class DashboardScreen extends StatelessWidget {
                   child: Text(
                     'Swipe left to delete • Tap to edit',
                     style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: colors.shimmer,
-                    ),
+                        fontSize: 11, color: colors.shimmer),
                   ),
                 ),
                 const SizedBox(height: 12),
+
                 Expanded(
-                  child: transactions.isEmpty
+                  child: filtered.isEmpty
                       ? _buildEmptyState(colors)
                       : ListView.builder(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: transactions.length,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20),
+                          itemCount: filtered.length,
                           itemBuilder: (context, index) {
                             return _buildTransactionCard(
-                                context, transactions[index], colors);
+                                context, filtered[index], colors);
                           },
                         ),
                 ),
@@ -91,15 +180,53 @@ class DashboardScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          final result = await Navigator.push<String>(
             context,
             MaterialPageRoute(
                 builder: (_) => const AddTransactionScreen()),
           );
+          if (result != null) _showSnackbar(result);
         },
         backgroundColor: const Color(0xFF2563EB),
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildMonthChip({
+    required String label,
+    required bool isSelected,
+    required AppColors colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(right: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF2563EB)
+              : colors.card,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF2563EB)
+                : colors.border,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : colors.textSecondary,
+          ),
+        ),
       ),
     );
   }
@@ -108,6 +235,7 @@ class DashboardScreen extends StatelessWidget {
       double balance, double totalIncome, double totalExpense) {
     final formatter =
         NumberFormat.currency(symbol: '₦', decimalDigits: 2);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
@@ -125,15 +253,40 @@ class DashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.church_rounded,
+                    color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Church Finance',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           Text(
-            'Church Balance',
+            _selectedMonth == null
+                ? 'Total Balance'
+                : DateFormat('MMMM yyyy').format(_selectedMonth!),
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: 13,
               color: Colors.white70,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             formatter.format(balance),
             style: GoogleFonts.inter(
@@ -142,7 +295,7 @@ class DashboardScreen extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
@@ -176,7 +329,8 @@ class DashboardScreen extends StatelessWidget {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(16),
@@ -217,18 +371,33 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTransactionCard(
-      BuildContext context, TransactionModel transaction, AppColors colors) {
+  Widget _buildTransactionCard(BuildContext context,
+      TransactionModel transaction, AppColors colors) {
     final formatter =
         NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final dateFormatter = DateFormat('MMM d, yyyy');
 
     final incomeMeta = {
-      'Offering': {'icon': Icons.volunteer_activism_rounded, 'color': const Color(0xFF34D399)},
-      'Tithe': {'icon': Icons.church_rounded, 'color': const Color(0xFF2563EB)},
-      'Sabbath School': {'icon': Icons.menu_book_rounded, 'color': const Color(0xFFFBBF24)},
-      'Alumni Donation': {'icon': Icons.school_rounded, 'color': const Color(0xFFA78BFA)},
-      'Others': {'icon': Icons.add_circle_outline_rounded, 'color': const Color(0xFF94A3B8)},
+      'Offering': {
+        'icon': Icons.volunteer_activism_rounded,
+        'color': const Color(0xFF34D399)
+      },
+      'Tithe': {
+        'icon': Icons.church_rounded,
+        'color': const Color(0xFF2563EB)
+      },
+      'Sabbath School': {
+        'icon': Icons.menu_book_rounded,
+        'color': const Color(0xFFFBBF24)
+      },
+      'Alumni Donation': {
+        'icon': Icons.school_rounded,
+        'color': const Color(0xFFA78BFA)
+      },
+      'Others': {
+        'icon': Icons.add_circle_outline_rounded,
+        'color': const Color(0xFF94A3B8)
+      },
     };
 
     final IconData icon;
@@ -237,7 +406,8 @@ class DashboardScreen extends StatelessWidget {
     if (!transaction.isExpense) {
       final meta = incomeMeta[transaction.category];
       icon = (meta?['icon'] as IconData?) ?? Icons.attach_money_rounded;
-      color = (meta?['color'] as Color?) ?? const Color(0xFF34D399);
+      color =
+          (meta?['color'] as Color?) ?? const Color(0xFF34D399);
     } else {
       icon = Icons.money_off_rounded;
       color = const Color(0xFFFB7185);
@@ -262,7 +432,7 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             content: Text(
-              'This will permanently remove "${transaction.title}". This cannot be undone.',
+              'This will permanently remove "${transaction.title}".',
               style: GoogleFonts.inter(
                   fontSize: 13, color: colors.textSecondary),
             ),
@@ -285,7 +455,10 @@ class DashboardScreen extends StatelessWidget {
           ),
         );
       },
-      onDismissed: (_) => transaction.delete(),
+      onDismissed: (_) {
+        transaction.delete();
+        _showSnackbar('Transaction deleted');
+      },
       background: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -298,12 +471,16 @@ class DashboardScreen extends StatelessWidget {
             color: Colors.white, size: 26),
       ),
       child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
+        onTap: () async {
+          final result = await Navigator.push<String>(
+            context,
+            MaterialPageRoute(
               builder: (_) =>
-                  AddTransactionScreen(existing: transaction)),
-        ),
+                  AddTransactionScreen(existing: transaction),
+            ),
+          );
+          if (result != null) _showSnackbar(result);
+        },
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
@@ -312,10 +489,9 @@ class DashboardScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2)),
             ],
           ),
           child: Row(
@@ -348,6 +524,28 @@ class DashboardScreen extends StatelessWidget {
                           fontSize: 12, color: colors.textMuted),
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (transaction.note != null &&
+                        transaction.note!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.notes_rounded,
+                              size: 11, color: colors.textMuted),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              transaction.note!,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: colors.textMuted,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -377,16 +575,21 @@ class DashboardScreen extends StatelessWidget {
           Icon(Icons.church_rounded, size: 64, color: colors.shimmer),
           const SizedBox(height: 16),
           Text(
-            'No transactions yet',
+            _selectedMonth == null
+                ? 'No transactions yet'
+                : 'No transactions for ${DateFormat('MMMM yyyy').format(_selectedMonth!)}',
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: colors.textMuted,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
           Text(
-            'Tap + to record your first entry',
+            _selectedMonth == null
+                ? 'Tap + to record your first entry'
+                : 'Try selecting a different month',
             style: GoogleFonts.inter(
                 fontSize: 13, color: colors.textMuted),
           ),

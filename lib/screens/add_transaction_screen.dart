@@ -13,10 +13,12 @@ class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key, this.existing});
 
   @override
-  State<AddTransactionScreen> createState() => _AddTransactionScreenState();
+  State<AddTransactionScreen> createState() =>
+      _AddTransactionScreenState();
 }
 
-class _AddTransactionScreenState extends State<AddTransactionScreen> {
+class _AddTransactionScreenState
+    extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
@@ -28,11 +30,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   DateTime _selectedDate = DateTime.now();
 
   final List<Map<String, dynamic>> _incomeCategories = [
-    {'name': 'Offering', 'icon': Icons.volunteer_activism_rounded, 'color': const Color(0xFF34D399)},
-    {'name': 'Tithe', 'icon': Icons.church_rounded, 'color': const Color(0xFF2563EB)},
-    {'name': 'Sabbath School', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFFFBBF24)},
-    {'name': 'Alumni Donation', 'icon': Icons.school_rounded, 'color': const Color(0xFFA78BFA)},
-    {'name': 'Others', 'icon': Icons.add_circle_outline_rounded, 'color': const Color(0xFF94A3B8)},
+    {
+      'name': 'Offering',
+      'icon': Icons.volunteer_activism_rounded,
+      'color': const Color(0xFF34D399)
+    },
+    {
+      'name': 'Tithe',
+      'icon': Icons.church_rounded,
+      'color': const Color(0xFF2563EB)
+    },
+    {
+      'name': 'Sabbath School',
+      'icon': Icons.menu_book_rounded,
+      'color': const Color(0xFFFBBF24)
+    },
+    {
+      'name': 'Alumni Donation',
+      'icon': Icons.school_rounded,
+      'color': const Color(0xFFA78BFA)
+    },
+    {
+      'name': 'Others',
+      'icon': Icons.add_circle_outline_rounded,
+      'color': const Color(0xFF94A3B8)
+    },
   ];
 
   @override
@@ -83,6 +105,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final box = Hive.box<TransactionModel>('transactions');
+    final isEditing = widget.existing != null;
+
     final transaction = TransactionModel(
       id: widget.existing?.id ?? const Uuid().v4(),
       title: _titleController.text.trim(),
@@ -97,7 +121,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           : _noteController.text.trim(),
     );
 
-    if (widget.existing != null) {
+    if (isEditing) {
       widget.existing!
         ..title = transaction.title
         ..amount = transaction.amount
@@ -110,7 +134,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       box.put(transaction.id, transaction);
     }
 
-    Navigator.pop(context);
+    Navigator.pop(
+      context,
+      isEditing ? 'Transaction updated' : 'Transaction added',
+    );
   }
 
   @override
@@ -124,7 +151,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          widget.existing != null ? 'Edit Transaction' : 'Add Transaction',
+          widget.existing != null
+              ? 'Edit Transaction'
+              : 'Add Transaction',
           style: GoogleFonts.inter(
               fontWeight: FontWeight.w600,
               fontSize: 18,
@@ -170,11 +199,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               controller: _titleController,
               hint: _isExpense
                   ? 'e.g. Generator fuel payment'
-                  : 'e.g. Sunday morning offering',
+                  : 'e.g. Sabbath offering',
               colors: colors,
-              validator: (val) => val == null || val.trim().isEmpty
-                  ? 'Please enter a label'
-                  : null,
+              validator: (val) =>
+                  val == null || val.trim().isEmpty
+                      ? 'Please enter a label'
+                      : null,
             ),
 
             const SizedBox(height: 20),
@@ -219,9 +249,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 hint: 'e.g. PA system repair, stationery...',
                 colors: colors,
                 maxLines: 2,
-                validator: (val) => val == null || val.trim().isEmpty
-                    ? 'Please describe the expense'
-                    : null,
+                validator: (val) =>
+                    val == null || val.trim().isEmpty
+                        ? 'Please describe the expense'
+                        : null,
               ),
             ],
 
@@ -444,8 +475,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             fontSize: 14, color: colors.textPrimary),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle:
-              GoogleFonts.inter(fontSize: 14, color: colors.shimmer),
+          hintStyle: GoogleFonts.inter(
+              fontSize: 14, color: colors.shimmer),
           filled: true,
           fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(
